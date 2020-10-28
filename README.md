@@ -1,2 +1,2 @@
 # Cox-sMBPLS
-Multi-Omics data integration using a supervised Cox multiblock PLS
+This repository includes the R-code to implement a supervised Cox-sMBPLS model (MS DOI: XXX). 
