@@ -344,14 +344,15 @@ cox.smbpls = function(Xtrain,
     lX[, k] = lX[, k] + Ak[1, k] * T_p[[1]] 
     lX[, k] = lX[, k] + Ak[2, k] * T_p[[2]]
     lX[, k] = lX[, k] + Ak[3, k] * T_p[[3]]
-    
+  
+  
     
     ## Output storage
     # Weights (w)
     w.global.k = do.call("rbind", what)
     w.global.k = matrix(w.global.k, ncol=1)
     w.global.k = w.global.k / sqrt(as.numeric(t(w.global.k) %*% w.global.k))
-    W[,k] <- w.global.k
+    W[,k] = w.global.k
     
     # Latent components (t)
     t.global.k = lX[, k]
@@ -490,10 +491,6 @@ result = list(Xtrain = Xtrain,
               
               hatY.train = hatY,
               residuals.train = residuals,
-              
-              hatY.test=hatY.test,
-              R2.test = R_square.test,
-              residual.test = residual.test,
               
               block.weights = cov2[, 1:ncomp, drop=F],
               block.weights2 = Ak[, 1:ncomp, drop=F],
