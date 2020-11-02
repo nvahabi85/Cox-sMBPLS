@@ -435,8 +435,8 @@ MBsPLS.result = MB_spls3_Cox(Xtrain = dat.train.list[2:4],
                              scale.X=TRUE, 
                              scale.Y=TRUE,
                              weighted.center=FALSE)
-cindex.MBsPLS.train.tuned = MBsPLS.result$Cindex.train
-cindex.MBsPLS.test.tuned = MBsPLS.result$Cindex.test
+cindex.MBsPLS.train.tuned = MBsPLS.result$cindex.train
+cindex.MBsPLS.test.tuned = MBsPLS.result$cindex.test
 
 
 ## AUC: Time-dependent area under the Roc curve ###
