@@ -396,11 +396,11 @@ for (lambda_i in lambda_tune_set) {
     # write the params used
     tune_lambda_result_lambda_ncomp_i = MBsPLS.result.tune$lambda.l1
     tune_ncomp_result_lambda_ncomp_i = MBsPLS.result.tune$ncomp
-    train_cindex_result_lambda_ncomp_i = MBsPLS.result.tune$Cindex.train
-    test_cindex_result_lambda_ncomp_i = MBsPLS.result.tune$Cindex.test
+    train_cindex_result_lambda_ncomp_i = MBsPLS.result.tune$cindex.train
+    test_cindex_result_lambda_ncomp_i = MBsPLS.result.tune$cindex.test
     # Save the results
-    tuning_result[tuning_result$ncomp==ncomp_i & tuning_result$lambda_i==lambda_i, 3] = MBsPLS.result.tune$Cindex.train
-    tuning_result[tuning_result$ncomp==ncomp_i & tuning_result$lambda_i==lambda_i, 4] = MBsPLS.result.tune$Cindex.test
+    tuning_result[tuning_result$ncomp==ncomp_i & tuning_result$lambda_i==lambda_i, 3] = MBsPLS.result.tune$cindex.train
+    tuning_result[tuning_result$ncomp==ncomp_i & tuning_result$lambda_i==lambda_i, 4] = MBsPLS.result.tune$cindex.test
     
   } 
 }
@@ -425,8 +425,8 @@ surv.test = with(dat.test.list[[1]], Surv(dat.test.list[[1]][,3], dat.test.list[
 source("fun.cox.smbpls.R")
 MBsPLS.result = MB_spls3_Cox(Xtrain = dat.train.list[2:4], 
                              Ytrain = dat.train.list[[1]], 
-                             lambda.l1 = 0.95, 
-                             ncomp = 2,
+                             lambda.l1 = lambda.tuned, 
+                             ncomp = ncomp.tuned,
                              weight.mat=NULL, 
                              Xtest = dat.test.list[2:4], # Turn "Xtest=TRUE" in MBsPLS function
                              Ytest = dat.test.list[[1]], #Turn "Ytest=TRUE" in MBsPLS function
