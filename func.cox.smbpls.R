@@ -252,7 +252,6 @@ MB_spls3_Cox = function(Xtrain,
     } else { 
       Xnames = colnames(Xtrain[[x]])})
 
-    
   new2As = lapply(1:nblo, function(b) list()); names(new2As) = list_name
   for (k in 1:ncomp.max) {
     M = list()
