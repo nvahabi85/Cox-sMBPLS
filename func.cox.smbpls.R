@@ -113,7 +113,6 @@ MB_spls3_Cox = function(Xtrain,
   if ( (weighted.center) && (is.null(weight.mat))) {
     stop("If the centering is weighted, the weighting matrix V should be provided")
   }
-  
   #####################################################################
   #### Centering and Scaling
   #####################################################################
@@ -410,54 +409,60 @@ MB_spls3_Cox = function(Xtrain,
   }
 
   # Final data (train) to fit the Cox-PH model with latent components as the covariates
-  data.final.cox = cbind(y.orig, status, T)
-  data.final.cox = as.data.frame(data.final.cox)
-  Cox.mbspls = coxph(Surv(y, status) ~ ., data = data.final.cox, x=TRUE, y=TRUE)
+  dat.train = cbind(y.orig, status, T)
+  dat.train = as.data.frame(dat.train)
+  Cox.mbspls = coxph(Surv(y, status) ~ ., data = dat.train, x=TRUE, y=TRUE)
   # C-index train
-  cindex.train1 = summary(Cox.mbspls)$concordance[1]
+  cindex.train = summary(Cox.mbspls)$concordance[1]
   
   
-  
-  # Final data (test) preparation
-  ww = W
-  bb2 = cov2
-  
-  # Weights (w)
-  w_gene = ww[rownames(ww) %like% "GENE.", ]
-  w_gene = as.matrix(w_gene)
-  w_snp = ww[rownames(ww) %like% "SNP.X", ]
-  w_snp = as.matrix(w_snp)
-  w_cpg = ww[rownames(ww) %like% "CPG.", ]
-  w_cpg = as.matrix(w_cpg)
-  
-  # block weights (b)
-  b_gene = bb2[1, ] #GENE
-  b_snp = bb2[2, ] #SNP
-  b_cpg = bb2[3, ] #SNP
-
-  # bw
-  dimlab = paste("Ax", 1:ncomp, sep = "")
-  bw_gene = matrix(0, nrow=nrow(w_gene), ncol = ncomp, dimnames = list(row.names(w_gene), dimlab))
-  bw_snp = matrix(0, nrow=nrow(w_snp), ncol = ncomp, dimnames = list(row.names(w_snp), dimlab))
-  bw_cpg = matrix(0, nrow=nrow(w_cpg), ncol = ncomp, dimnames = list(row.names(w_cpg), dimlab))
-
-  for(k in 1:ncomp) {
-    bw_gene[, k] = b_gene[k] * w_gene[, k] 
-    bw_snp[, k] = b_snp[k] * w_snp [, k]
-    bw_cpg[, k]  = b_cpg[k] * w_cpg[, k]
+  ## dat.test preparation
+  if (!is.null(Xtest)) {
+    ww = W
+    bb2 = cov2
+    
+    # Weights (w)
+    w_gene = ww[rownames(ww) %like% "GENE.", ]
+    w_gene = as.matrix(w_gene)
+    w_snp = ww[rownames(ww) %like% "SNP.X", ]
+    w_snp = as.matrix(w_snp)
+    w_cpg = ww[rownames(ww) %like% "CPG.", ]
+    w_cpg = as.matrix(w_cpg)
+    
+    # block weights (b)
+    b_gene = bb2[1, ] #GENE
+    b_snp = bb2[2, ] #SNP
+    b_cpg = bb2[3, ] #SNP
+    
+    # bw
+    dimlab = paste("Ax", 1:ncomp, sep = "")
+    bw_gene = matrix(0, nrow=nrow(w_gene), ncol = ncomp, dimnames = list(row.names(w_gene), dimlab))
+    bw_snp = matrix(0, nrow=nrow(w_snp), ncol = ncomp, dimnames = list(row.names(w_snp), dimlab))
+    bw_cpg = matrix(0, nrow=nrow(w_cpg), ncol = ncomp, dimnames = list(row.names(w_cpg), dimlab))
+    
+    for(k in 1:ncomp) {
+      bw_gene[, k] = b_gene[k] * w_gene[, k] 
+      bw_snp[, k] = b_snp[k] * w_snp [, k]
+      bw_cpg[, k]  = b_cpg[k] * w_cpg[, k]
+    }
+    bw = rbind(bw_gene, bw_snp, bw_cpg)
+    
+    # Latent components (T = original.X %*% bw)
+    orig.x = X.test
+    Ts = as.matrix(orig.x) %*% as.matrix(bw)
+    
+    # Final test data
+    dat.test = cbind.data.frame(y.orig.test, status.test, as.data.frame(Ts)) #Orig.Y
+    # C-index test
+    pred.test = predict(Cox.mbspls, dat.test)
+    cindex.test = concordance.index(x=pred.test, surv.time=dat.test$y, surv.event=dat.test$status, method="noether")
+    cindex.test = cindex.test$c.index
+  } 
+  else {
+    dat.test = NULL
+    pred.test = NULL
+    cindex.test = NULL
   }
-  bw = rbind(bw_gene, bw_snp, bw_cpg)
-
-  # Latent components (T = original.X %*% bw)
-  orig.x = X.test
-  Ts = as.matrix(orig.x) %*% as.matrix(bw)
-  
-  # Final test data
-  data.final.cox.test = cbind.data.frame(y.orig.test, status.test, as.data.frame(Ts)) #Orig.Y
-  # C-index test
-  pred.test = predict(Cox.mbspls, data.final.cox.test)
-  cindex.test2 = concordance.index(x=pred.test, surv.time=data.final.cox.test$y, surv.event=data.final.cox.test$status, method="noether")
-  cindex.test2 = cindex.test2$c.index
 
   # RESULTS # 
   result = list(Xtrain = Xtrain,
@@ -488,12 +493,12 @@ MB_spls3_Cox = function(Xtrain,
                 block.weights2 = Ak[, 1:ncomp, drop=F],
                 block.importance = bip[, 1:ncomp, drop=F],
                 
-                data.train.final.cox = data.final.cox,
+                dat.train = dat.train,
                 Cox.mbspls = Cox.mbspls,
-                Cindex.train1 = cindex.train1,
-                data.test.final.cox = data.final.cox.test,
+                cindex.train = cindex.train,
+                dat.test = dat.test,
                 pred.test = pred.test,
-                Cindex.test2 = cindex.test2)
+                cindex.test = cindex.test)
   
   class(result) = c("Multiblock", "MB_spls_Cox", "cox-PH")
   return(result)
