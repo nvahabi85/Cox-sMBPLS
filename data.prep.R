@@ -442,7 +442,7 @@ cindex.MBsPLS.test.tuned = MBsPLS.result$cindex.test
 ## AUC: Time-dependent area under the Roc curve ###
 fit.mbspls.cox = MBsPLS.result$Cox.mbspls
 dat.test = MBsPLS.result$dat.test
-surv.train = with(dat.train.valid.list[[1]], Surv(dat.train.valid.list[[1]][,3], dat.train.valid.list[[1]][,2]))
+surv.train = with(dat.train.list[[1]], Surv(dat.train.list[[1]][,3], dat.train.list[[1]][,2]))
 
 # Chambless & Diao AUC
 max_time = max(Y$y)
