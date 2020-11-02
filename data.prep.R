@@ -24,7 +24,6 @@ library(plsgenomics)
 library(pec) # predictSurvProb()
 library(survAUC) # AUC.cd()
 library(magrittr) # %>%
-#library(mefa4) # %notin%()
 library(dplyr) # %>%
 library(purrr) # map()
 library(ade4) # mbpls()
@@ -304,9 +303,8 @@ surv.test = with(dat.test, Surv(y,status))
 
 ###################################################################################################
 #### Supervised Cox-sMBPLS mODEL ####
-# Fit the supervised Cox-sMBPLS model
-# For the proposed model (supervised Cox-sMBPLS),we run a Train/Test/Valid experiments, to also validate the model.
-# therefore, we use 85% of the train-set as a valid-set to validate the model. 
+# For the proposed model (supervised Cox-sMBPLS),we run a Train/Test/Valid experiments, to also validate the model using the valid-set.
+# Therefore, we use 85% of the train-set as a valid-set to validate the model. 
 
 ## Data Preparation & Tuning
 # Train-set
@@ -346,7 +344,6 @@ XX1.valid = XX1.valid[order(rownames(XX1.valid)), , drop=F]
 XX1.test = X1_new_test[which(rownames(X1_new_test) %in% rownames(X1.test)), ]
 XX1.test = XX1.test[order(rownames(XX1.test)), ]
 
-
 XX2.train = X2_new_train[index_train, ]
 XX2.train = XX2.train[order(rownames(XX2.train)), ]
 XX2.valid = X2_new_train[ !(rownames(X2_new_train) %in% rownames(XX2.train)), , drop=F]
@@ -361,6 +358,9 @@ XX3.valid = XX3.valid[order(rownames(XX3.valid)), , drop=F]
 XX3.test = X3_new_test[which(rownames(X3_new_test) %in% rownames(X3.test)), ]
 XX3.test = XX3.test[order(rownames(XX3.test)), ]
 
+y.train.finalCox = cbind.data.frame(Y.rew.train, Y.train[ , 1, drop=FALSE])
+y.test.finalCox = cbind.data.frame(Y.rew.test, Y.test[ , 1, drop=FALSE])
+
 YY.train = y.train.finalCox[index_train, ]
 YY.train = YY.train[order(rownames(YY.train)), ]
 YY.valid = y.train.finalCox[ !(rownames(y.train.finalCox) %in% rownames(YY.train)), ]
@@ -368,36 +368,26 @@ YY.valid = YY.valid[order(rownames(YY.valid)), ]
 YY.test = y.test.finalCox[which(rownames(y.test.finalCox) %in% rownames(Y.test)), ]
 YY.test = YY.test[order(rownames(YY.test)), ]
 
-y.train.finalCox = cbind.data.frame(Y.rew.train, Y.train[ , 1, drop=FALSE])
-y.test.finalCox = cbind.data.frame(Y.rew.test, Y.test[ , 1, drop=FALSE])
-
-# Final Data for the supervised Cox-sMBPLS model 
-dat.train.list = list(rbind(YY.train, YY.valid), rbind(XX1.train, XX1.valid), rbind(XX2.train, XX2.valid), rbind(XX3.train, XX3.valid)) #list
-names(dat.train.list) = c("Y", "GENE", "SNP", "CPG")
-
-dat.test.list = list(YY.test, XX1.test, XX2.test, XX3.test) #list
-names(dat.test.list) = c("Y.test", "GENE.test", "SNP.test", "CPG.test")
-surv.test = with(dat.test.list[[1]], Surv(dat.test.list[[1]][,3], dat.test.list[[1]][,2]))
 
 ## Parameter tuning
 ptm.mbspls = proc.time()
 source("fun.cox.smbpls.R")
 ncomp_tune_set = c(2,3,4)
 lambda_tune_set = c(0.0001, 0.1, 0.5, 0.95)
-tuning_result = expand.grid("ncomp_i" = ncomp_tune_set, # Components no
-                            "lambda_i" = lambda_tune_set, # Sparsity
+tuning_result = expand.grid("ncomp_i" = ncomp_tune_set, # Number of the latent components
+                            "lambda_i" = lambda_tune_set, # Sparsity parameter
                             "cindex.train_i" = NA, 
                             "cindex.test_i" = NA,
                             stringsAsFactors = FALSE)
 for (lambda_i in lambda_tune_set) {
   for (ncomp_i in ncomp_tune_set) {
-    MBsPLS.result.tune = MB_spls3_Cox(Xtrain = dat.train.list[2:4], 
-                                      Ytrain = dat.train.list[[1]], 
+    MBsPLS.result.tune = MB_spls3_Cox(Xtrain = list(XX1.train, XX2.train, XX3.train), 
+                                      Ytrain = YY.train, 
                                       lambda.l1 = lambda_i, 
                                       ncomp = ncomp_i,
                                       weight.mat=NULL, 
-                                      Xtest = dat.test.list[2:4], # Turn "Xtest=TRUE" in MBsPLS function
-                                      Ytest = dat.test.list[[1]], #Turn "Ytest=TRUE" in MBsPLS function
+                                      Xtest = list(XX1.valid, XX2.valid, XX3.valid),
+                                      Ytest = YY.valid,
                                       center.X=TRUE, 
                                       center.Y=TRUE,
                                       scale.X=TRUE, 
@@ -406,11 +396,11 @@ for (lambda_i in lambda_tune_set) {
     # write the params used
     tune_lambda_result_lambda_ncomp_i = MBsPLS.result.tune$lambda.l1
     tune_ncomp_result_lambda_ncomp_i = MBsPLS.result.tune$ncomp
-    train_cindex_result_lambda_ncomp_i = MBsPLS.result.tune$Cindex.train1
-    test_cindex_result_lambda_ncomp_i = MBsPLS.result.tune$Cindex.test2
+    train_cindex_result_lambda_ncomp_i = MBsPLS.result.tune$Cindex.train
+    test_cindex_result_lambda_ncomp_i = MBsPLS.result.tune$Cindex.test
     # Save the results
-    tuning_result[tuning_result$ncomp==ncomp_i & tuning_result$lambda_i==lambda_i, 3] = MBsPLS.result.tune$Cindex.train1
-    tuning_result[tuning_result$ncomp==ncomp_i & tuning_result$lambda_i==lambda_i, 4] = MBsPLS.result.tune$Cindex.test2
+    tuning_result[tuning_result$ncomp==ncomp_i & tuning_result$lambda_i==lambda_i, 3] = MBsPLS.result.tune$Cindex.train
+    tuning_result[tuning_result$ncomp==ncomp_i & tuning_result$lambda_i==lambda_i, 4] = MBsPLS.result.tune$Cindex.test
     
   } 
 }
@@ -421,14 +411,22 @@ ncomp.tuned = tuning_result$ncomp_i[1]
 cindex.MBsPLS.traine.tuneFunc = tuning_result$cindex.train_i[1]
 cindex.MBsPLS.valid.tuneFunc = tuning_result$cindex.test_i[1]
 
-## Cox-sMBPLS model fit
+
+## Final model using the tuned parameters (train+valid/test)
+# Data
+dat.train.list = list(rbind(YY.train, YY.valid), rbind(XX1.train, XX1.valid), rbind(XX2.train, XX2.valid), rbind(XX3.train, XX3.valid)) #list
+names(dat.train.list) = c("Y", "GENE", "SNP", "CPG")
+
+dat.test.list = list(YY.test, XX1.test, XX2.test, XX3.test) #list
+names(dat.test.list) = c("Y.test", "GENE.test", "SNP.test", "CPG.test")
+surv.test = with(dat.test.list[[1]], Surv(dat.test.list[[1]][,3], dat.test.list[[1]][,2]))
+
+## Cox-sMBPLS
 source("fun.cox.smbpls.R")
-dat.train.valid.list = list(rbind(YY.train, YY.valid), rbind(XX1.train, XX1.valid), rbind(XX2.train, XX2.valid), rbind(XX3.train, XX3.valid))
-names(dat.train.valid.list) = c("Y.trainTotal", "GENE.TrainTotal", "SNP.TrainTotal", "CPG.TrainTotal")
-MBsPLS.result = MB_spls3_Cox(Xtrain = dat.train.valid.list[2:4], 
-                             Ytrain = dat.train.valid.list[[1]], 
-                             lambda.l1 = lambda.tuned, 
-                             ncomp = ncomp.tuned,
+MBsPLS.result = MB_spls3_Cox(Xtrain = dat.train.list[2:4], 
+                             Ytrain = dat.train.list[[1]], 
+                             lambda.l1 = 0.95, 
+                             ncomp = 2,
                              weight.mat=NULL, 
                              Xtest = dat.test.list[2:4], # Turn "Xtest=TRUE" in MBsPLS function
                              Ytest = dat.test.list[[1]], #Turn "Ytest=TRUE" in MBsPLS function
@@ -437,29 +435,29 @@ MBsPLS.result = MB_spls3_Cox(Xtrain = dat.train.valid.list[2:4],
                              scale.X=TRUE, 
                              scale.Y=TRUE,
                              weighted.center=FALSE)
-cindex.MBsPLS.train.tuned = MBsPLS.result$Cindex.train1
-cindex.MBsPLS.test.tuned = MBsPLS.result$Cindex.test2_2
+cindex.MBsPLS.train.tuned = MBsPLS.result$Cindex.train
+cindex.MBsPLS.test.tuned = MBsPLS.result$Cindex.test
 
 
-## AUC
+## AUC: Time-dependent area under the Roc curve ###
 fit.mbspls.cox = MBsPLS.result$Cox.mbspls
-data.test.final.cox = MBsPLS.result$data.test.final.cox
-surv.train.valid = with(dat.train.valid.list[[1]], Surv(dat.train.valid.list[[1]][,3], dat.train.valid.list[[1]][,2]))
+dat.test = MBsPLS.result$dat.test
+surv.train = with(dat.train.valid.list[[1]], Surv(dat.train.valid.list[[1]][,3], dat.train.valid.list[[1]][,2]))
 
 # Chambless & Diao AUC
 max_time = max(Y$y)
 times = seq(10, max_time, 20) 
-auc.mbspls = AUC.cd(surv.train.valid, 
+auc.mbspls = AUC.cd(surv.train, 
                     surv.test, 
                     predict(fit.mbspls.cox), 
-                    predict(fit.mbspls.cox, data.test.final.cox), 
+                    predict(fit.mbspls.cox, dat.test), 
                     times)
 MBsPLS.iauc1 = auc.mbspls$iauc 
 
 # Heagerty D/I AUC
 w.ROC = risksetROC(Stime = Y.test$y,  
                    status = Y.test$status, 
-                   marker = predict(fit.mbspls.cox, data.test.final.cox), 
+                   marker = predict(fit.mbspls.cox, dat.test), 
                    predict.time = median(Y.test$y), 
                    method = "Cox", 
                    main = paste("OOB Survival ROC Curve at median(t)"), 
@@ -468,9 +466,9 @@ w.ROC = risksetROC(Stime = Y.test$y,
 MBsPLS.auc2 = w.ROC$AUC
 
 # Uno's AUC
-AUC_Uno.mbspla = AUC.uno(surv.train.valid, 
+AUC_Uno.mbspla = AUC.uno(surv.train, 
                          surv.test,
-                         predict(fit.mbspls.cox, data.test.final.cox),
+                         predict(fit.mbspls.cox, dat.test),
                          times)
 MBsPLS.uno = AUC_Uno.mbspla$auc[1]
 MBsPLS.iuno = AUC_Uno.mbspla$iauc
