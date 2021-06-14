@@ -1,0 +1,6 @@
+## Survival time (y) Re-weighting 
+Y.rew = Y[order(Y$y), ] #sort by time
+sc = survfit(Surv(y, 1-status) ~ 1, data = Y.rew)$surv #survival function of censoring 
+sc = c(1, sc[-nrow(Y.rew)]) #shift by 1
+is.nan.data.frame = function(x) do.call(cbind, lapply(x, is.nan))
+	Y.rew[is.nan(Y.rew)] = 0
